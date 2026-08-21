@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --bg: #F5F7F8;
@@ -316,9 +316,6 @@
   </div>
 </div>
 
-<!-- Container tersembunyi tempat notulen dirender jadi HTML sebelum dikonversi ke PDF di browser -->
-<div id="pdfRenderArea" style="position:fixed; left:-9999px; top:0; width:794px; background:#fff;"></div>
-
 <script>
   /* URL deployment Apps Script Anda */
   const API_URL = 'https://script.google.com/macros/s/AKfycbwdpF7A0cWviq4gOPPcLS4TPyBW_Ofdwy1OZ-ElpwAA9fAkys94jb_k4KaPEcUCItMF/exec';
@@ -502,7 +499,7 @@
     document.querySelectorAll('.ai-err, .ai-success').forEach(e2 => e2.remove());
     if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = AI_BTN_LOADING; }
     try {
-      const res = await apiPost({ action: 'rapikanDenganAI', teks });
+      const res = await apiPost({ action: 'rapikanDenganAI', teks }, 20000);
       if (res.success) {
         el.value = res.hasil;
         el.insertAdjacentHTML('afterend', `<div class="success-msg ai-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Sudah dirapikan AI</div>`);
@@ -575,75 +572,151 @@
     (d.kas || []).forEach(k => tambahKas(k.nama, k.saldoLalu, k.masuk, k.keluar));
   }
 
-  function fotoDataUrl(item) {
-    return item ? `data:${item.mimeType};base64,${item.data}` : null;
+  /* ================= PDF (jsPDF langsung — cepat, tanpa screenshot HTML) ================= */
+
+  const PDF_LHF = 1.15;
+  function pdfLineH(doc, fontSize) { return fontSize * PDF_LHF / doc.internal.scaleFactor; }
+  function safeTxt(v) { return (v === undefined || v === null || v === '') ? '-' : String(v); }
+
+  function ensureSpace(doc, y, needed) {
+    if (y + needed > 283) { doc.addPage(); return 15; }
+    return y;
   }
 
-  function buildNotulenHtml(payload, nomorNotulen, unit, fotoList) {
-    const kasHtml = (payload.kas && payload.kas.length > 0) ? `
-      <h3 class="pdfdoc-section">Laporan Kas</h3>
-      <table class="pdfdoc-kas">
-        <tr><th>Nama Kas</th><th>Saldo Lalu</th><th>Pemasukan</th><th>Pengeluaran</th><th>Saldo Kini</th></tr>
-        ${payload.kas.map(k => `
-          <tr>
-            <td>${escHtml(k.nama)}</td><td>${k.saldoLalu}</td><td>${k.masuk}</td><td>${k.keluar}</td><td>${k.saldoAkhir}</td>
-          </tr>`).join('')}
-      </table>` : '';
-
-    const nextHtml = (payload.rapatBerikutTanggal || payload.rapatBerikutTempat) ? `
-      <h3 class="pdfdoc-section">Rencana Rapat Berikutnya</h3>
-      <p class="pdfdoc-body">${escHtml(payload.rapatBerikutTanggal || '')}${payload.rapatBerikutTempat ? ' — ' + escHtml(payload.rapatBerikutTempat) : ''}</p>` : '';
-
-    const captions = ['Daftar hadir', 'Suasana rapat', 'Dokumentasi tambahan'];
-    const fotoHtml = (fotoList.length > 0) ? `
-      <h3 class="pdfdoc-section">Dokumentasi</h3>
-      <div class="pdfdoc-foto-grid">
-        ${fotoList.map((uri, i) => `
-          <div class="pdfdoc-foto-item">
-            <img src="${uri}">
-            <div class="pdfdoc-cap">${captions[i] || 'Foto'}</div>
-          </div>`).join('')}
-      </div>` : '';
-
-    return `
-      <div style="font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; padding: 32px 40px; box-sizing:border-box;">
-        <style>
-          .pdfdoc-section { font-size: 11pt; font-weight: bold; margin: 16px 0 6px; text-decoration: underline; }
-          .pdfdoc-body { font-size: 10.5pt; line-height: 1.6; white-space: pre-line; margin: 0; text-align: justify; }
-          .pdfdoc-kas { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10pt; }
-          .pdfdoc-kas th, .pdfdoc-kas td { border: 1px solid #000; padding: 5px 8px; text-align: right; }
-          .pdfdoc-kas th { text-align: center; font-weight: bold; }
-          .pdfdoc-kas td:first-child, .pdfdoc-kas th:first-child { text-align: left; }
-          .pdfdoc-foto-grid { display: flex; gap: 10px; margin-top: 8px; }
-          .pdfdoc-foto-item { width: 33%; }
-          .pdfdoc-foto-item img { width: 100%; height: 105px; object-fit: cover; border: 1px solid #999; }
-          .pdfdoc-cap { font-size: 8.5pt; color: #444; text-align: center; margin-top: 3px; }
-        </style>
-        <p style="text-align:center; font-size:14pt; font-weight:bold; margin:0 0 2px; text-transform:uppercase; letter-spacing:0.5px;">Notulen Rapat</p>
-        <p style="text-align:center; font-size:10.5pt; margin:0 0 4px;">${escHtml(unit)} — ${escHtml(payload.jenisRapat || '')}</p>
-        <p style="text-align:center; font-size:10pt; color:#333; margin-bottom:16px;">Nomor: ${escHtml(nomorNotulen)}</p>
-        <hr style="border:none; border-top:2px solid #000; border-bottom:1px solid #000; height:3px; margin:0 0 16px;">
-        <table style="width:100%; margin-bottom:16px;">
-          <tr><td style="width:120px; padding:2px 0; font-size:10.5pt;">Hari, tanggal</td><td style="width:12px;">:</td><td style="padding:2px 0; font-size:10.5pt;">${escHtml(payload.tanggal)}</td></tr>
-          <tr><td style="padding:2px 0; font-size:10.5pt;">Waktu</td><td>:</td><td style="padding:2px 0; font-size:10.5pt;">${escHtml(payload.waktu)}</td></tr>
-          <tr><td style="padding:2px 0; font-size:10.5pt;">Tempat</td><td>:</td><td style="padding:2px 0; font-size:10.5pt;">${escHtml(payload.tempat)}</td></tr>
-          <tr><td style="padding:2px 0; font-size:10.5pt;">Jumlah hadir</td><td>:</td><td style="padding:2px 0; font-size:10.5pt;">${escHtml(payload.jumlahHadir)} orang</td></tr>
-        </table>
-        <h3 class="pdfdoc-section">Agenda</h3>
-        <p class="pdfdoc-body">${escHtml(payload.agenda)}</p>
-        <h3 class="pdfdoc-section">Pembahasan &amp; Usulan</h3>
-        <p class="pdfdoc-body">${escHtml(payload.pembahasan)}</p>
-        <h3 class="pdfdoc-section">Keputusan / Hasil Rapat</h3>
-        <p class="pdfdoc-body">${escHtml(payload.keputusan)}</p>
-        ${kasHtml}
-        ${nextHtml}
-        ${fotoHtml}
-        <div style="margin-top:26px; padding-top:8px; border-top:1px solid #999; font-size:8pt; color:#666; text-align:center;">Dibuat otomatis melalui sistem notulen digital — ${escHtml(unit)} · ${escHtml(nomorNotulen)}</div>
-      </div>`;
+  function sectionHeader(doc, text, x, y) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+    doc.text(text, x, y);
+    const w = doc.getTextWidth(text);
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+    doc.line(x, y + 1, x + w, y + 1);
+    return y + 6;
   }
 
-  function escHtml(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function bodyParagraph(doc, text, x, y, maxW) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(20, 20, 20);
+    const lines = doc.splitTextToSize(safeTxt(text), maxW);
+    const lineH = pdfLineH(doc, 10.5);
+    y = ensureSpace(doc, y, lines.length * lineH);
+    doc.text(lines, x, y, { lineHeightFactor: PDF_LHF });
+    return y + lines.length * lineH + 4;
+  }
+
+  function drawKasTable(doc, x, yStart, colWidths, rows) {
+    let y = yStart;
+    const rowH = 7;
+    const totalW = colWidths.reduce((a, b) => a + b, 0);
+    const header = ['Nama Kas', 'Saldo Lalu', 'Pemasukan', 'Pengeluaran', 'Saldo Kini'];
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.rect(x, y, totalW, rowH);
+    let cx = x;
+    header.forEach((h, i) => {
+      if (i > 0) doc.line(cx, y, cx, y + rowH);
+      doc.text(h, i === 0 ? cx + 2 : cx + colWidths[i] - 2, y + rowH / 2 + 1.2, { align: i === 0 ? 'left' : 'right' });
+      cx += colWidths[i];
+    });
+    y += rowH;
+    doc.setFont('helvetica', 'normal');
+    rows.forEach(r => {
+      y = ensureSpace(doc, y, rowH);
+      doc.rect(x, y, totalW, rowH);
+      let cx2 = x;
+      r.forEach((val, i) => {
+        if (i > 0) doc.line(cx2, y, cx2, y + rowH);
+        doc.text(String(val), i === 0 ? cx2 + 2 : cx2 + colWidths[i] - 2, y + rowH / 2 + 1.2, { align: i === 0 ? 'left' : 'right' });
+        cx2 += colWidths[i];
+      });
+      y += rowH;
+    });
+    return y + 4;
+  }
+
+  function jsPdfFormat(mimeType) {
+    return (mimeType || '').includes('png') ? 'PNG' : 'JPEG';
+  }
+
+  function buildNotulenPdf(payload, nomorNotulen, unit, fotoItems) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = 210, marginX = 20, contentW = pageW - marginX * 2;
+    let y = 20;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
+    doc.text('NOTULEN RAPAT', pageW / 2, y, { align: 'center' });
+    y += 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+    doc.text(`${unit} — ${safeTxt(payload.jenisRapat)}`, pageW / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+    doc.text(`Nomor: ${nomorNotulen}`, pageW / 2, y, { align: 'center' });
+    y += 4;
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.7);
+    doc.line(marginX, y, pageW - marginX, y);
+    doc.setLineWidth(0.2);
+    doc.line(marginX, y + 1, pageW - marginX, y + 1);
+    y += 8;
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(20, 20, 20);
+    const infoRows = [
+      ['Hari, tanggal', payload.tanggal],
+      ['Waktu', payload.waktu],
+      ['Tempat', payload.tempat],
+      ['Jumlah hadir', `${safeTxt(payload.jumlahHadir)} orang`]
+    ];
+    infoRows.forEach(([label, val]) => {
+      doc.text(label, marginX, y);
+      doc.text(':', marginX + 32, y);
+      doc.text(safeTxt(val), marginX + 36, y);
+      y += 5.5;
+    });
+    y += 3;
+
+    y = sectionHeader(doc, 'Agenda', marginX, y);
+    y = bodyParagraph(doc, payload.agenda, marginX, y, contentW);
+
+    y = ensureSpace(doc, y, 10);
+    y = sectionHeader(doc, 'Pembahasan & Usulan', marginX, y);
+    y = bodyParagraph(doc, payload.pembahasan, marginX, y, contentW);
+
+    y = ensureSpace(doc, y, 10);
+    y = sectionHeader(doc, 'Keputusan / Hasil Rapat', marginX, y);
+    y = bodyParagraph(doc, payload.keputusan, marginX, y, contentW);
+
+    if (payload.kas && payload.kas.length > 0) {
+      y = ensureSpace(doc, y, 20);
+      y = sectionHeader(doc, 'Laporan Kas', marginX, y);
+      const kasRows = payload.kas.map(k => [k.nama, k.saldoLalu, k.masuk, k.keluar, k.saldoAkhir]);
+      y = drawKasTable(doc, marginX, y, [contentW * 0.3, contentW * 0.175, contentW * 0.175, contentW * 0.175, contentW * 0.175], kasRows);
+    }
+
+    if (payload.rapatBerikutTanggal || payload.rapatBerikutTempat) {
+      y = ensureSpace(doc, y, 15);
+      y = sectionHeader(doc, 'Rencana Rapat Berikutnya', marginX, y);
+      const teks = safeTxt(payload.rapatBerikutTanggal) + (payload.rapatBerikutTempat ? ' — ' + payload.rapatBerikutTempat : '');
+      y = bodyParagraph(doc, teks, marginX, y, contentW);
+    }
+
+    if (fotoItems.length > 0) {
+      const captions = ['Daftar hadir', 'Suasana rapat', 'Dokumentasi tambahan'];
+      const gap = 6, perRow = 3;
+      const imgW = (contentW - gap * (perRow - 1)) / perRow, imgH = imgW * 0.75;
+      y = ensureSpace(doc, y, 10 + imgH + 6);
+      y = sectionHeader(doc, 'Dokumentasi', marginX, y);
+      fotoItems.forEach((item, i) => {
+        const x = marginX + i * (imgW + gap);
+        try {
+          doc.addImage(`data:${item.mimeType};base64,${item.data}`, jsPdfFormat(item.mimeType), x, y, imgW, imgH);
+        } catch (e) { /* lewati foto yang gagal, jangan gagalkan seluruh PDF */ }
+        doc.setFontSize(8.5); doc.setTextColor(70, 70, 70);
+        doc.text(captions[i] || 'Foto', x + imgW / 2, y + imgH + 4, { align: 'center' });
+      });
+      y += imgH + 10;
+    }
+
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text(`Dibuat otomatis melalui sistem notulen digital — ${unit} · ${nomorNotulen}`, pageW / 2, 290, { align: 'center' });
+
+    return doc;
   }
 
   function blobToBase64(blob) {
@@ -668,19 +741,10 @@
     if (res.error) { statusEl.textContent = 'Gagal: ' + res.error; btn.disabled = false; return; }
 
     statusEl.textContent = 'Membuat PDF...';
-    const fotoUris = fotoUntukUpload.map(fotoDataUrl);
-    const html = buildNotulenHtml(payload, res.nomorNotulen, currentUnit, fotoUris);
-    const renderArea = document.getElementById('pdfRenderArea');
-    renderArea.innerHTML = html;
-
     let pdfUrlFinal = '';
     try {
-      const pdfBlob = await html2pdf().from(renderArea).set({
-        margin: 0,
-        image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
-      }).outputPdf('blob');
+      const doc = buildNotulenPdf(payload, res.nomorNotulen, currentUnit, fotoUntukUpload);
+      const pdfBlob = doc.output('blob');
 
       statusEl.textContent = 'Mengunggah PDF...';
       const pdfBase64 = await blobToBase64(pdfBlob);
@@ -689,7 +753,6 @@
     } catch (e) {
       statusEl.textContent = 'Data tersimpan, tapi PDF gagal dibuat/diunggah.';
     }
-    renderArea.innerHTML = '';
 
     btn.disabled = false;
     statusEl.textContent = '';
