@@ -81,6 +81,10 @@
   button.main:active { transform: scale(0.98); background: var(--teal-dark); }
   .error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; font-weight: 500; display: none; }
   .error-msg a { color: inherit; }
+  .success-msg { color: #15803D; font-size: 12.5px; margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .success-msg svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ===== SEGMENTED TABS ===== */
   .tabs { display: flex; background: var(--surface-2); border-radius: 14px; padding: 4px; margin: 6px 0 18px; }
@@ -236,14 +240,14 @@
 
         <label>Pembahasan &amp; usulan</label>
         <textarea id="f_pembahasan" rows="3" placeholder="tulis bebas, misal: bahas jadwal ronda, usulan pak budi ronda dipercepat jam 9 (disetujui)"></textarea>
-        <button class="btn-ai" onclick="rapikan('f_pembahasan')">
+        <button class="btn-ai" onclick="rapikan('f_pembahasan', this)">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>
           Rapikan dengan AI
         </button>
 
         <label>Keputusan / hasil rapat</label>
         <textarea id="f_keputusan" rows="2" placeholder="Kerja bakti Minggu 30 Agustus jam 07.00, bawa alat kebersihan sendiri"></textarea>
-        <button class="btn-ai" onclick="rapikan('f_keputusan')">
+        <button class="btn-ai" onclick="rapikan('f_keputusan', this)">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>
           Rapikan dengan AI
         </button>
@@ -311,7 +315,7 @@
 <script>
   /* GANTI URL INI dengan URL deployment Apps Script Anda,
      format: https://script.google.com/macros/s/XXXXX/exec */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbwdpF7A0cWviq4gOPPcLS4TPyBW_Ofdwy1OZ-ElpwAA9fAkys94jb_k4KaPEcUCItMF/exec';
+  const API_URL = 'GANTI_DENGAN_URL_APPS_SCRIPT_ANDA';
 
   let currentUnit = null;
   let editId = null;
@@ -469,14 +473,36 @@
     reader.readAsDataURL(file);
   }
 
-  async function rapikan(fieldId) {
+  let rapikanSedangJalan = false;
+  const AI_BTN_DEFAULT = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>Rapikan dengan AI`;
+  const AI_BTN_LOADING = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Merapikan...`;
+
+  async function rapikan(fieldId, btnEl) {
+    if (rapikanSedangJalan) return;
     const el = document.getElementById(fieldId);
     const teks = el.value;
     if (!teks.trim()) return;
+    rapikanSedangJalan = true;
     el.disabled = true;
-    const res = await apiPost({ action: 'rapikanDenganAI', teks });
+    document.querySelectorAll('.ai-err, .ai-success').forEach(e2 => e2.remove());
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = AI_BTN_LOADING; }
+    try {
+      const res = await apiPost({ action: 'rapikanDenganAI', teks });
+      if (res.success) {
+        el.value = res.hasil;
+        el.insertAdjacentHTML('afterend', `<div class="success-msg ai-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Sudah dirapikan AI</div>`);
+        setTimeout(() => { document.querySelectorAll('.ai-success').forEach(e2 => e2.remove()); }, 4000);
+      } else {
+        el.insertAdjacentHTML('afterend', `<div class="error-msg ai-err" style="display:block; margin-top:6px;">${res.message}</div>`);
+        setTimeout(() => { document.querySelectorAll('.ai-err').forEach(e2 => e2.remove()); }, 6000);
+      }
+    } catch (e) {
+      el.insertAdjacentHTML('afterend', `<div class="error-msg ai-err" style="display:block; margin-top:6px;">Server sedang lambat, coba lagi sebentar.</div>`);
+      setTimeout(() => { document.querySelectorAll('.ai-err').forEach(e2 => e2.remove()); }, 6000);
+    }
     el.disabled = false;
-    if (res.success) el.value = res.hasil; else alert(res.message);
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = AI_BTN_DEFAULT; }
+    rapikanSedangJalan = false;
   }
 
   let draftTimer = null;
