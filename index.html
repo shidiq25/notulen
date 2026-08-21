@@ -52,10 +52,26 @@
   label { display: block; font-size: 12.5px; color: var(--ink-soft); margin: 14px 0 6px; font-weight: 600; }
   input, select, textarea {
     width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1.5px solid transparent;
-    background: var(--surface-2); font-size: 15px; font-family: inherit; color: var(--ink);
+    background: var(--surface-2); font-size: 16px; font-family: inherit; color: var(--ink);
   }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--teal); background: var(--surface); box-shadow: 0 0 0 4px var(--teal-tint); }
   textarea { resize: vertical; line-height: 1.55; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (min-width: 640px) {
+    .shell { max-width: 640px; padding: 0 28px 72px; }
+    .card, .login-card { padding: 22px 24px; }
+    .row2 { gap: 14px; }
+  }
+  @media (min-width: 900px) {
+    .shell { max-width: 760px; }
+    .appbar h1 { font-size: 19px; }
+    .foto-grid { gap: 12px; }
+  }
+  @media (max-width: 359px) {
+    .shell { padding: 0 10px 56px; }
+    .card, .login-card { padding: 14px 12px; }
+  }
 
   button.main {
     width: 100%; margin-top: 24px; padding: 14px; border-radius: 14px; border: none;
@@ -188,10 +204,7 @@
 
       <div class="card">
         <div class="card-label">Waktu &amp; tempat</div>
-        <div class="row2">
-          <div><label>Tanggal</label><input type="date" id="f_tanggal"></div>
-          <div><label>Waktu</label><input type="time" id="f_waktu"></div>
-        </div>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Tanggal &amp; jam tercatat otomatis saat notulen disimpan.</p>
         <label>Tempat</label>
         <input type="text" id="f_tempat" placeholder="Rumah Bp Dukuh">
 
@@ -294,7 +307,7 @@
 <script>
   /* GANTI URL INI dengan URL deployment Apps Script Anda,
      format: https://script.google.com/macros/s/XXXXX/exec */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbwdpF7A0cWviq4gOPPcLS4TPyBW_Ofdwy1OZ-ElpwAA9fAkys94jb_k4KaPEcUCItMF/exec';
+  const API_URL = 'GANTI_DENGAN_URL_APPS_SCRIPT_ANDA';
 
   let currentUnit = null;
   let editId = null;
@@ -413,7 +426,7 @@
 
   let draftTimer = null;
   function jadwalkanAutosave() { clearTimeout(draftTimer); draftTimer = setTimeout(simpanDraft, 1500); }
-  ['f_tanggal','f_waktu','f_tempat','f_jenis','f_hadir','f_agenda','f_pembahasan','f_keputusan','f_nextTanggal','f_nextTempat'].forEach(id => {
+  ['f_tempat','f_jenis','f_hadir','f_agenda','f_pembahasan','f_keputusan','f_nextTanggal','f_nextTempat'].forEach(id => {
     document.addEventListener('input', function(e) { if (e.target.id === id) jadwalkanAutosave(); });
   });
   function simpanDraft() { localStorage.setItem(DRAFT_KEY, JSON.stringify(ambilForm())); }
@@ -430,10 +443,14 @@
     const jenis = document.getElementById('f_jenis').value === 'lainnya'
       ? document.getElementById('f_jenisLain').value
       : document.getElementById('f_jenis').value;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const tanggalOtomatis = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const waktuOtomatis = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     return {
       id: editId,
-      tanggal: document.getElementById('f_tanggal').value,
-      waktu: document.getElementById('f_waktu').value,
+      tanggal: editId ? (window.__editTanggal || tanggalOtomatis) : tanggalOtomatis,
+      waktu: editId ? (window.__editWaktu || waktuOtomatis) : waktuOtomatis,
       tempat: document.getElementById('f_tempat').value,
       jenisRapat: jenis,
       jumlahHadir: document.getElementById('f_hadir').value,
@@ -447,8 +464,8 @@
   }
 
   function isiForm(d) {
-    document.getElementById('f_tanggal').value = d.tanggal || '';
-    document.getElementById('f_waktu').value = d.waktu || '';
+    window.__editTanggal = d.tanggal || '';
+    window.__editWaktu = d.waktu || '';
     document.getElementById('f_tempat').value = d.tempat || '';
     document.getElementById('f_hadir').value = d.jumlahHadir || '';
     document.getElementById('f_agenda').value = d.agenda || '';
@@ -474,6 +491,8 @@
     statusEl.textContent = '';
     localStorage.removeItem(DRAFT_KEY);
     editId = null;
+    window.__editTanggal = null;
+    window.__editWaktu = null;
     fotoData = [null, null, null];
     tampilkanSeal(res.nomorNotulen, currentUnit, res.pdfUrl);
   }
