@@ -540,13 +540,15 @@
       keputusan: document.getElementById('f_keputusan').value,
       kas: kumpulkanKas(),
       rapatBerikutTanggal: document.getElementById('f_nextTanggal').value,
-      rapatBerikutTempat: document.getElementById('f_nextTempat').value
+      rapatBerikutTempat: document.getElementById('f_nextTempat').value,
+      fotoUrls: window.__existingFotoUrls || []
     };
   }
 
   function isiForm(d) {
     window.__editTanggal = d.tanggal || '';
     window.__editWaktu = d.waktu || '';
+    window.__existingFotoUrls = d.fotoUrls || [];
     document.getElementById('f_tempat').value = d.tempat || '';
     document.getElementById('f_hadir').value = d.jumlahHadir || '';
     document.getElementById('f_agenda').value = d.agenda || '';
@@ -574,6 +576,7 @@
     editId = null;
     window.__editTanggal = null;
     window.__editWaktu = null;
+    window.__existingFotoUrls = null;
     fotoData = [null, null, null];
     tampilkanSeal(res.nomorNotulen, currentUnit, res.pdfUrl);
   }
