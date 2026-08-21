@@ -80,6 +80,7 @@
   }
   button.main:active { transform: scale(0.98); background: var(--teal-dark); }
   .error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; font-weight: 500; display: none; }
+  .error-msg a { color: inherit; }
 
   /* ===== SEGMENTED TABS ===== */
   .tabs { display: flex; background: var(--surface-2); border-radius: 14px; padding: 4px; margin: 6px 0 18px; }
@@ -168,7 +169,10 @@
       <p class="login-sub">Pilih unit dan masukkan PIN untuk mulai mencatat.</p>
 
       <label for="unit">Unit</label>
-      <select id="unit"></select>
+      <select id="unit"><option value="">Memuat daftar unit...</option></select>
+      <div class="error-msg" id="unitLoadErr" style="margin-top:6px;">
+        Gagal memuat daftar unit. <a href="#" onclick="event.preventDefault(); muatUnitList(true);" style="color:var(--teal-dark); font-weight:600;">Coba lagi</a>
+      </div>
 
       <label for="pin">PIN</label>
       <input type="password" id="pin" inputmode="numeric" placeholder="••••">
@@ -314,25 +318,71 @@
   let fotoData = [null, null, null];
   const DRAFT_KEY = 'notulen_draft_v1';
 
-  async function apiGet(params) {
+  async function apiGet(params, timeoutMs) {
     const qs = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_URL}?${qs}`);
-    return res.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 15000);
+    try {
+      const res = await fetch(`${API_URL}?${qs}`, { signal: controller.signal });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  async function apiPost(body) {
-    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-    return res.json();
+  async function apiPost(body, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 20000);
+    try {
+      const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body), signal: controller.signal });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  (async function init() {
-    const units = await apiGet({ action: 'getUnitList' });
+  const UNIT_CACHE_KEY = 'notulen_units_cache';
+
+  function isiDropdownUnit(units) {
     const sel = document.getElementById('unit');
-    (units || []).forEach(u => {
+    sel.innerHTML = '';
+    units.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u; opt.textContent = u;
       sel.appendChild(opt);
     });
-  })();
+  }
+
+  async function muatUnitList(isRetry) {
+    const errEl = document.getElementById('unitLoadErr');
+    errEl.style.display = 'none';
+
+    // Tampilkan cache dulu (kalau ada) supaya langsung muncul, sambil ambil data terbaru di background
+    const cached = localStorage.getItem(UNIT_CACHE_KEY);
+    if (cached && !isRetry) {
+      try { isiDropdownUnit(JSON.parse(cached)); } catch (e) { /* abaikan cache rusak */ }
+    } else if (isRetry) {
+      document.getElementById('unit').innerHTML = '<option value="">Memuat daftar unit...</option>';
+    }
+
+    try {
+      const units = await apiGet({ action: 'getUnitList' });
+      if (units && units.length > 0) {
+        isiDropdownUnit(units);
+        localStorage.setItem(UNIT_CACHE_KEY, JSON.stringify(units));
+      } else if (!cached) {
+        errEl.textContent = 'Daftar unit kosong. Cek sheet "UnitPIN" di spreadsheet.';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      if (!cached) {
+        document.getElementById('unit').innerHTML = '<option value="">—</option>';
+        errEl.style.display = 'block';
+      }
+      // kalau ada cache, biarkan cache tetap tampil meski request terbaru gagal/timeout
+    }
+  }
+
+  muatUnitList(false);
 
   async function doLogin() {
     const unit = document.getElementById('unit').value;
@@ -340,16 +390,21 @@
     const errEl = document.getElementById('loginErr');
     errEl.style.display = 'none';
     if (!pin) { errEl.textContent = 'Masukkan PIN terlebih dahulu'; errEl.style.display = 'block'; return; }
-    const res = await apiPost({ action: 'login', unit, pin });
-    if (res.success) {
-      currentUnit = res.unit;
-      document.getElementById('loginView').classList.add('hidden');
-      document.getElementById('appView').classList.remove('hidden');
-      document.getElementById('unitLabel').textContent = currentUnit;
-      cekDraft();
-      tambahKas();
-    } else {
-      errEl.textContent = res.message || 'Gagal masuk';
+    try {
+      const res = await apiPost({ action: 'login', unit, pin });
+      if (res.success) {
+        currentUnit = res.unit;
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+        document.getElementById('unitLabel').textContent = currentUnit;
+        cekDraft();
+        tambahKas();
+      } else {
+        errEl.textContent = res.message || 'Gagal masuk';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Server sedang lambat merespons, coba beberapa saat lagi.';
       errEl.style.display = 'block';
     }
   }
