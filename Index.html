@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notulen Rapat</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0D9488">
+<link rel="icon" href="icon-192.png">
+<!-- Dukungan iOS: Apple tidak pakai manifest.json untuk beberapa hal ini, harus meta tag terpisah -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Notulen">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F5F7F8;
+    --surface: #FFFFFF;
+    --surface-2: #F1F4F5;
+    --ink: #111827;
+    --ink-soft: #6B7280;
+    --teal: #0D9488;
+    --teal-dark: #0F766E;
+    --teal-tint: #E6F5F3;
+    --orange: #F97316;
+    --orange-tint: #FFF1E6;
+    --danger: #DC2626;
+    --border: #E7EBEC;
+    --shadow-sm: 0 1px 2px rgba(17,24,39,0.05), 0 1px 1px rgba(17,24,39,0.04);
+    --shadow-md: 0 4px 14px rgba(17,24,39,0.07);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  .shell { max-width: 480px; margin: 0 auto; padding: 0 16px 64px; min-height: 100vh; }
+
+  /* ===== APP BAR ===== */
+  .appbar { display: flex; align-items: center; gap: 12px; padding: 20px 2px 18px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+  }
+  .logo svg { width: 22px; height: 22px; }
+  .appbar h1 { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; margin: 0; letter-spacing: -0.2px; }
+  .appbar .unit-tag { font-size: 12px; color: var(--ink-soft); margin-top: 1px; font-weight: 500; }
+  .btn-keluar { margin-left: auto; background: var(--surface-2); border: none; color: var(--ink-soft); font-size: 12px; font-weight: 600; cursor: pointer; padding: 7px 12px; border-radius: 8px; font-family: inherit; }
+
+  /* ===== LOGIN ===== */
+  .login-card { background: var(--surface); border-radius: 20px; padding: 28px 22px; box-shadow: var(--shadow-md); margin-top: 6px; }
+  .login-title { font-family: 'Sora', sans-serif; font-size: 21px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.3px; }
+  .login-sub { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 22px; }
+
+  label { display: block; font-size: 12.5px; color: var(--ink-soft); margin: 14px 0 6px; font-weight: 600; }
+  input, select, textarea {
+    width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1.5px solid transparent;
+    background: var(--surface-2); font-size: 16px; font-family: inherit; color: var(--ink);
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--teal); background: var(--surface); box-shadow: 0 0 0 4px var(--teal-tint); }
+  textarea { resize: vertical; line-height: 1.55; }
+  #f_pembahasan, #f_keputusan { min-height: clamp(120px, 26vw, 220px); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (min-width: 640px) {
+    .shell { max-width: 640px; padding: 0 28px 72px; }
+    .card, .login-card { padding: 22px 24px; }
+    .row2 { gap: 14px; }
+  }
+  @media (min-width: 900px) {
+    .shell { max-width: 760px; }
+    .appbar h1 { font-size: 19px; }
+    .foto-grid { gap: 12px; }
+  }
+  @media (max-width: 359px) {
+    .shell { padding: 0 10px 56px; }
+    .card, .login-card { padding: 14px 12px; }
+  }
+
+  button.main {
+    width: 100%; margin-top: 24px; padding: 14px; border-radius: 14px; border: none;
+    background: var(--teal); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: 'Inter', sans-serif; box-shadow: var(--shadow-sm); transition: transform 0.1s, background 0.15s;
+  }
+  button.main:active { transform: scale(0.98); background: var(--teal-dark); }
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; font-weight: 500; display: none; }
+  .error-msg a { color: inherit; }
+  .success-msg { color: #15803D; font-size: 12.5px; margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .success-msg svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .shake { animation: shake 0.4s; border-color: var(--danger) !important; background: #FEF2F2 !important; }
+  @keyframes shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-5px); } 40%, 60% { transform: translateX(5px); } }
+
+  /* ===== SEGMENTED TABS ===== */
+  .tabs { display: flex; background: var(--surface-2); border-radius: 14px; padding: 4px; margin: 6px 0 18px; }
+  .tab-btn {
+    flex: 1; background: none; border: none; padding: 10px 4px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 700; color: var(--ink-soft); cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--teal-dark); box-shadow: var(--shadow-sm); }
+
+  /* ===== CARD ===== */
+  .card { background: var(--surface); border-radius: 18px; padding: 18px 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm); }
+  .card-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--teal-dark); font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .card-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hidden { display: none !important; }
+
+  .btn-ghost { padding: 9px 14px; border-radius: 10px; border: none; background: var(--teal-tint); color: var(--teal-dark); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .btn-ai { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 10px; border: none; background: var(--orange-tint); color: #9A4C0C; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .btn-ai svg { width: 13px; height: 13px; }
+
+  /* ===== KAS ===== */
+  .kas-block { background: var(--surface-2); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  .kas-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .kas-row3 input { font-size: 13px; padding: 9px 10px; background: var(--surface); }
+  .kas-preview { font-size: 12px; color: var(--ink-soft); margin-top: 8px; text-align: right; }
+  .kas-preview b { color: var(--teal-dark); font-weight: 700; }
+  .kas-block .kasNama { background: var(--surface); }
+
+  /* ===== FOTO ===== */
+  .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .foto-slot {
+    aspect-ratio: 1; border: 1.5px dashed #C9D2D4; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    font-size: 10px; color: var(--ink-soft); text-align: center; overflow: hidden; position: relative;
+    background: var(--surface-2); cursor: pointer;
+  }
+  .foto-slot svg { width: 18px; height: 18px; opacity: 0.6; }
+  .foto-slot-icon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .foto-slot-img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+
+  .draft-banner { background: var(--orange-tint); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; font-size: 13px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #9A4C0C; }
+
+  /* ===== RIWAYAT ===== */
+  .riwayat-item { padding: 13px 4px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .riwayat-item:last-child { border-bottom: none; }
+  .riwayat-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--teal-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .riwayat-icon svg { width: 16px; height: 16px; }
+  .riwayat-item .r-title { font-weight: 600; font-size: 14px; }
+  .riwayat-item .r-meta { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+  .btn-icon-edit { flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--surface-2); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .btn-icon-edit svg { width: 15px; height: 15px; }
+  .empty-state { text-align: center; padding: 36px 10px; color: var(--ink-soft); font-size: 13.5px; }
+
+  /* ===== SUCCESS SEAL ===== */
+  .seal-overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.5); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .seal-card {
+    background: var(--surface); border-radius: 24px; padding: 32px 26px; text-align: center;
+    max-width: 300px; box-shadow: 0 20px 50px rgba(17,24,39,0.25);
+    transform: scale(0.85); opacity: 0; animation: sealIn 0.35s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  @keyframes sealIn { to { transform: scale(1); opacity: 1; } }
+  .seal-badge {
+    width: 74px; height: 74px; border-radius: 50%; margin: 0 auto 16px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(13,148,136,0.35);
+  }
+  .seal-badge svg { width: 34px; height: 34px; }
+  .seal-title { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; margin: 0 0 4px; }
+  .seal-nomor { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--teal-dark); background: var(--teal-tint); display: inline-block; padding: 5px 12px; border-radius: 8px; margin: 6px 0 4px; }
+  .seal-unit { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 18px; }
+
+  .status-msg { font-size: 13px; margin-top: 10px; text-align: center; color: var(--ink-soft); font-weight: 500; }
+
+  .install-banner {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 55;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff;
+    border-radius: 16px; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: 0 8px 24px rgba(13,148,136,0.35); max-width: 456px; margin: 0 auto;
+  }
+  .install-banner-text { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; line-height: 1.3; }
+  .install-banner-text strong { font-size: 14px; font-family: 'Sora', sans-serif; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div id="loginView">
+    <div class="appbar">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div>
+        <h1>Notulen Rapat</h1>
+        <div class="unit-tag">RT · RW · Padukuhan</div>
+      </div>
+    </div>
+
+    <div class="login-card" id="loginCard">
+      <p class="login-title">Selamat datang</p>
+      <p class="login-sub">Pilih unit dan masukkan PIN untuk mulai mencatat.</p>
+
+      <label for="unit">Unit</label>
+      <select id="unit"><option value="">Memuat daftar unit...</option></select>
+      <div class="error-msg" id="unitLoadErr" style="margin-top:6px;">
+        Gagal memuat daftar unit. <a href="#" onclick="event.preventDefault(); muatUnitList(true);" style="color:var(--teal-dark); font-weight:600;">Coba lagi</a>
+      </div>
+
+      <label for="pin">PIN</label>
+      <input type="password" id="pin" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter') doLogin()">
+
+      <div class="error-msg" id="loginErr"></div>
+      <button class="main" id="btnMasuk" onclick="doLogin()">Masuk</button>
+      <p style="text-align:center; font-size:12.5px; color:var(--ink-soft); margin:14px 0 0;">
+        Sekretaris baru? <a href="#" onclick="event.preventDefault(); tampilkanDaftar();" style="color:var(--teal-dark); font-weight:700; text-decoration:none;">Daftar PIN di sini</a>
+      </p>
+    </div>
+
+    <div class="login-card hidden" id="daftarCard" style="margin-top:12px;">
+      <p class="login-title">Daftar PIN</p>
+      <p class="login-sub">Untuk sekretaris yang belum pernah punya PIN. Kalau unit Anda tidak muncul di daftar, berarti sudah terdaftar — hubungi admin kalau lupa PIN.</p>
+
+      <label for="daftarUnit">Unit</label>
+      <select id="daftarUnit"><option value="">Memuat...</option></select>
+
+      <label for="daftarPin1">Buat PIN (minimal 4 karakter)</label>
+      <input type="password" id="daftarPin1" inputmode="numeric" placeholder="••••">
+
+      <label for="daftarPin2">Ulangi PIN</label>
+      <input type="password" id="daftarPin2" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter') doDaftar()">
+
+      <div class="error-msg" id="daftarErr"></div>
+      <button class="main" id="btnDaftar" onclick="doDaftar()">Daftar</button>
+      <p style="text-align:center; font-size:12.5px; color:var(--ink-soft); margin:14px 0 0;">
+        <a href="#" onclick="event.preventDefault(); tampilkanLogin();" style="color:var(--teal-dark); font-weight:700; text-decoration:none;">← Kembali ke halaman masuk</a>
+      </p>
+    </div>
+  </div>
+
+  <div id="appView" class="hidden">
+    <div class="appbar">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div>
+        <h1>Notulen Rapat</h1>
+        <div class="unit-tag" id="unitLabel">—</div>
+      </div>
+      <button class="btn-keluar" onclick="keluar()">Keluar</button>
+    </div>
+
+    <div class="tabs">
+      <button id="tabBaruBtn" class="tab-btn active" onclick="showTab('baru')">Buat Baru</button>
+      <button id="tabRiwayatBtn" class="tab-btn" onclick="showTab('riwayat')">Riwayat</button>
+    </div>
+
+    <div id="tabBaru">
+      <div id="draftBanner" class="draft-banner hidden">
+        <span>Ada draft belum selesai. Lanjutkan?</span>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-ghost" onclick="lanjutkanDraft()">Lanjutkan</button>
+          <button class="btn-ghost" onclick="buangDraft()">Baru</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Waktu &amp; tempat</div>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Tanggal &amp; jam tercatat otomatis saat notulen disimpan.</p>
+        <label>Tempat</label>
+        <input type="text" id="f_tempat" placeholder="Rumah Bp Dukuh">
+
+        <div class="row2">
+          <div>
+            <label>Jenis rapat</label>
+            <select id="f_jenis" onchange="toggleJenisLain()">
+              <option>Rapat bulanan</option>
+              <option>Rapat kecil</option>
+              <option value="lainnya">Lainnya…</option>
+            </select>
+          </div>
+          <div><label>Jumlah hadir</label><input type="number" id="f_hadir" placeholder="25"></div>
+        </div>
+        <div id="jenisLainWrap" class="hidden">
+          <label>Jenis rapat (isi manual)</label>
+          <input type="text" id="f_jenisLain">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Jalannya rapat</div>
+        <label>Agenda</label>
+        <input type="text" id="f_agenda" placeholder="Kebersihan lingkungan & kerja bakti">
+
+        <label>Pembahasan &amp; usulan</label>
+        <textarea id="f_pembahasan" rows="3" placeholder="tulis bebas, misal: bahas jadwal ronda, usulan pak budi ronda dipercepat jam 9 (disetujui)"></textarea>
+        <button class="btn-ai" onclick="rapikan('f_pembahasan', this)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>
+          Rapikan dengan AI
+        </button>
+
+        <label>Keputusan / hasil rapat</label>
+        <textarea id="f_keputusan" rows="2" placeholder="Kerja bakti Minggu 30 Agustus jam 07.00, bawa alat kebersihan sendiri"></textarea>
+        <button class="btn-ai" onclick="rapikan('f_keputusan', this)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>
+          Rapikan dengan AI
+        </button>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="card-label" style="margin-bottom:0;">Laporan kas (opsional)</div>
+          <button class="btn-ghost" onclick="tambahKas()">+ Tambah kas</button>
+        </div>
+        <div id="kasWrap" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Rapat berikutnya</div>
+        <div class="row2">
+          <div><label>Tanggal</label><input type="date" id="f_nextTanggal"></div>
+          <div><label>Tempat</label><input type="text" id="f_nextTempat" placeholder="Rumah Bp Dukuh"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Dokumentasi (maks 3 foto)</div>
+        <div class="foto-grid">
+          <div class="foto-slot" id="fotoSlot0" onclick="document.getElementById('fotoInput0').click()">
+            <div class="foto-slot-icon" id="fotoIcon0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Daftar hadir
+            </div>
+            <img class="foto-slot-img hidden" id="fotoImg0">
+            <input type="file" id="fotoInput0" accept="image/*" class="hidden" onchange="pilihFoto(0)">
+          </div>
+          <div class="foto-slot" id="fotoSlot1" onclick="document.getElementById('fotoInput1').click()">
+            <div class="foto-slot-icon" id="fotoIcon1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Suasana rapat
+            </div>
+            <img class="foto-slot-img hidden" id="fotoImg1">
+            <input type="file" id="fotoInput1" accept="image/*" class="hidden" onchange="pilihFoto(1)">
+          </div>
+          <div class="foto-slot" id="fotoSlot2" onclick="document.getElementById('fotoInput2').click()">
+            <div class="foto-slot-icon" id="fotoIcon2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Tambahan
+            </div>
+            <img class="foto-slot-img hidden" id="fotoImg2">
+            <input type="file" id="fotoInput2" accept="image/*" class="hidden" onchange="pilihFoto(2)">
+          </div>
+        </div>
+      </div>
+
+      <button class="main" onclick="simpan()" id="btnSimpan">Simpan Notulen</button>
+      <div id="statusMsg" class="status-msg"></div>
+    </div>
+
+    <div id="tabRiwayat" class="hidden">
+      <input type="text" id="cariRiwayat" placeholder="Cari agenda atau tanggal..." oninput="muatRiwayat()" style="margin-bottom:12px;">
+      <div class="card" id="riwayatList" style="padding:6px 12px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="installBanner" class="install-banner hidden">
+  <div class="install-banner-text">
+    <strong id="installBannerTitle">Pasang aplikasi ini</strong>
+    <span id="installBannerDesc">Akses lebih cepat tanpa buka browser</span>
+  </div>
+  <div style="display:flex; gap:6px; flex-shrink:0; align-items:center;">
+    <button id="installBannerBtn" class="btn-ghost" style="background:#fff; color:var(--teal-dark);">Pasang</button>
+    <button onclick="tutupInstallBanner()" style="background:rgba(255,255,255,0.25); color:#fff; border:none; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:15px;">✕</button>
+  </div>
+</div>
+
+<div id="loadingOverlay" class="seal-overlay hidden">
+  <div style="text-align:center; color:#fff;">
+    <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="width:36px;height:36px;"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>
+    <p style="margin-top:12px; font-weight:600; font-family:'Inter',sans-serif;">Memuat notulen...</p>
+  </div>
+</div>
+
+<div id="sealOverlay" class="seal-overlay hidden" onclick="tutupSeal()">
+  <div class="seal-card" onclick="event.stopPropagation()">
+    <div class="seal-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+    <p class="seal-title">Notulen tersimpan</p>
+    <div class="seal-nomor" id="sealNomor">—</div>
+    <p class="seal-unit" id="sealUnit">—</p>
+    <p style="font-size:12px; color:var(--ink-soft); margin:0 0 18px;">PDF sudah otomatis terunduh ke perangkat ini.</p>
+    <button class="btn-ghost" style="width:100%; padding:11px;" onclick="tutupSeal()">Tutup</button>
+  </div>
+</div>
+
+<script>
+  /* URL deployment Apps Script Anda */
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwdpF7A0cWviq4gOPPcLS4TPyBW_Ofdwy1OZ-ElpwAA9fAkys94jb_k4KaPEcUCItMF/exec';
+
+  let currentUnit = null;
+  let editId = null;
+  let fotoSlots = [null, null, null]; // tiap slot: null | {kind:'existing', id, data, mimeType} | {kind:'new', data, mimeType}
+  const DRAFT_KEY = 'notulen_draft_v1';
+
+  async function apiGet(params, timeoutMs) {
+    const qs = new URLSearchParams(params).toString();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 15000);
+    try {
+      const res = await fetch(`${API_URL}?${qs}`, { signal: controller.signal });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async function apiPost(body, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 20000);
+    try {
+      const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body), signal: controller.signal });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const UNIT_CACHE_KEY = 'notulen_units_cache';
+
+  function isiDropdownUnit(units) {
+    const sel = document.getElementById('unit');
+    sel.innerHTML = '';
+    units.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u; opt.textContent = u;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function muatUnitList(isRetry) {
+    const errEl = document.getElementById('unitLoadErr');
+    errEl.style.display = 'none';
+
+    // Tampilkan cache dulu (kalau ada) supaya langsung muncul, sambil ambil data terbaru di background
+    const cached = localStorage.getItem(UNIT_CACHE_KEY);
+    if (cached && !isRetry) {
+      try { isiDropdownUnit(JSON.parse(cached)); } catch (e) { /* abaikan cache rusak */ }
+    } else if (isRetry) {
+      document.getElementById('unit').innerHTML = '<option value="">Memuat daftar unit...</option>';
+    }
+
+    try {
+      const units = await apiGet({ action: 'getUnitList' });
+      if (units && units.length > 0) {
+        isiDropdownUnit(units);
+        localStorage.setItem(UNIT_CACHE_KEY, JSON.stringify(units));
+      } else if (!cached) {
+        errEl.textContent = 'Daftar unit kosong. Cek sheet "UnitPIN" di spreadsheet.';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      if (!cached) {
+        document.getElementById('unit').innerHTML = '<option value="">—</option>';
+        errEl.style.display = 'block';
+      }
+      // kalau ada cache, biarkan cache tetap tampil meski request terbaru gagal/timeout
+    }
+  }
+
+  muatUnitList(false);
+
+  /* ================= DAFTAR PIN (self-registrasi) ================= */
+
+  function tampilkanDaftar() {
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('daftarCard').classList.remove('hidden');
+    muatUnitBelumDaftar();
+  }
+
+  function tampilkanLogin() {
+    document.getElementById('daftarCard').classList.add('hidden');
+    document.getElementById('loginCard').classList.remove('hidden');
+  }
+
+  async function muatUnitBelumDaftar() {
+    const sel = document.getElementById('daftarUnit');
+    sel.innerHTML = '<option value="">Memuat...</option>';
+    try {
+      const units = await apiGet({ action: 'getUnitBelumDaftar' });
+      if (!units || units.length === 0) {
+        sel.innerHTML = '<option value="">Semua unit sudah terdaftar</option>';
+        return;
+      }
+      sel.innerHTML = '';
+      units.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u; opt.textContent = u;
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      sel.innerHTML = '<option value="">Gagal memuat, coba lagi</option>';
+    }
+  }
+
+  async function doDaftar() {
+    const unit = document.getElementById('daftarUnit').value;
+    const pin1 = document.getElementById('daftarPin1').value;
+    const pin2 = document.getElementById('daftarPin2').value;
+    const errEl = document.getElementById('daftarErr');
+    errEl.style.display = 'none';
+
+    if (!unit) { errEl.textContent = 'Pilih unit terlebih dahulu'; errEl.style.display = 'block'; return; }
+    if (pin1.length < 4) { errEl.textContent = 'PIN minimal 4 karakter'; errEl.style.display = 'block'; return; }
+    if (pin1 !== pin2) { errEl.textContent = 'PIN tidak sama, coba ketik ulang'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('btnDaftar');
+    btn.disabled = true;
+    btn.textContent = 'Mendaftarkan...';
+    try {
+      const res = await apiPost({ action: 'daftarPin', unit, pin: pin1 });
+      if (res.success) {
+        tampilkanLogin();
+        document.getElementById('daftarPin1').value = '';
+        document.getElementById('daftarPin2').value = '';
+        muatUnitList(true); // refresh dropdown login supaya unit baru langsung kepilih dgn benar
+        document.getElementById('loginErr').style.display = 'none';
+        alert(`PIN untuk ${unit} berhasil dibuat. Silakan masuk.`);
+      } else {
+        errEl.textContent = res.message || 'Gagal mendaftar';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Server sedang lambat, coba lagi sebentar.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Daftar';
+  }
+
+  async function doLogin() {
+    const unit = document.getElementById('unit').value;
+    const pinEl = document.getElementById('pin');
+    const pin = pinEl.value;
+    const errEl = document.getElementById('loginErr');
+    const btnEl = document.getElementById('btnMasuk');
+    errEl.style.display = 'none';
+    pinEl.classList.remove('shake');
+    if (!pin) { errEl.textContent = 'Masukkan PIN terlebih dahulu'; errEl.style.display = 'block'; pinEl.classList.add('shake'); return; }
+    btnEl.disabled = true;
+    btnEl.textContent = 'Memeriksa...';
+    try {
+      const res = await apiPost({ action: 'login', unit, pin });
+      if (res.success) {
+        currentUnit = res.unit;
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+        document.getElementById('unitLabel').textContent = currentUnit;
+        cekDraft();
+      } else {
+        errEl.textContent = res.message || 'Gagal masuk';
+        errEl.style.display = 'block';
+        pinEl.classList.add('shake');
+        pinEl.value = '';
+        pinEl.focus();
+      }
+    } catch (e) {
+      errEl.textContent = 'Server sedang lambat merespons, coba beberapa saat lagi.';
+      errEl.style.display = 'block';
+    }
+    btnEl.disabled = false;
+    btnEl.textContent = 'Masuk';
+  }
+
+  function keluar() {
+    currentUnit = null;
+    document.getElementById('appView').classList.add('hidden');
+    document.getElementById('loginView').classList.remove('hidden');
+  }
+
+  function showTab(tab) {
+    document.getElementById('tabBaru').classList.toggle('hidden', tab !== 'baru');
+    document.getElementById('tabRiwayat').classList.toggle('hidden', tab !== 'riwayat');
+    document.getElementById('tabBaruBtn').classList.toggle('active', tab === 'baru');
+    document.getElementById('tabRiwayatBtn').classList.toggle('active', tab === 'riwayat');
+    if (tab === 'riwayat') muatRiwayat();
+  }
+
+  function toggleJenisLain() {
+    document.getElementById('jenisLainWrap').classList.toggle('hidden', document.getElementById('f_jenis').value !== 'lainnya');
+  }
+
+  function tambahKas(nama, saldoLalu, masuk, keluar) {
+    const wrap = document.getElementById('kasWrap');
+    const div = document.createElement('div');
+    div.className = 'kas-block';
+    div.innerHTML = `
+      <input type="text" placeholder="Kas RT" class="kasNama" value="${nama || ''}">
+      <div class="kas-row3">
+        <input type="number" placeholder="Saldo lalu" class="kasSaldoLalu" value="${saldoLalu || ''}">
+        <input type="number" placeholder="Masuk" class="kasMasuk" value="${masuk || ''}">
+        <input type="number" placeholder="Keluar" class="kasKeluar" value="${keluar || ''}">
+      </div>
+      <div class="kas-preview">Saldo kini: <b>Rp0</b></div>`;
+    wrap.appendChild(div);
+    const updatePreview = () => {
+      const sl = parseFloat(div.querySelector('.kasSaldoLalu').value) || 0;
+      const m = parseFloat(div.querySelector('.kasMasuk').value) || 0;
+      const k = parseFloat(div.querySelector('.kasKeluar').value) || 0;
+      div.querySelector('.kas-preview b').textContent = formatRupiah(sl + m - k);
+    };
+    div.querySelectorAll('.kasSaldoLalu, .kasMasuk, .kasKeluar').forEach(el => el.addEventListener('input', updatePreview));
+    updatePreview();
+  }
+
+  function kumpulkanKas() {
+    const blocks = document.querySelectorAll('#kasWrap .kas-block');
+    const hasil = [];
+    blocks.forEach(b => {
+      const nama = b.querySelector('.kasNama').value;
+      const saldoLalu = parseFloat(b.querySelector('.kasSaldoLalu').value) || 0;
+      const masuk = parseFloat(b.querySelector('.kasMasuk').value) || 0;
+      const keluar = parseFloat(b.querySelector('.kasKeluar').value) || 0;
+      if (nama || saldoLalu || masuk || keluar) {
+        hasil.push({ nama: nama || 'Kas', saldoLalu, masuk, keluar, saldoAkhir: saldoLalu + masuk - keluar });
+      }
+    });
+    return hasil;
+  }
+
+  function tampilkanFotoSlot(idx, dataUrl) {
+    document.getElementById('fotoIcon' + idx).classList.add('hidden');
+    const img = document.getElementById('fotoImg' + idx);
+    img.src = dataUrl;
+    img.classList.remove('hidden');
+  }
+
+  function kosongkanFotoSlot(idx) {
+    document.getElementById('fotoIcon' + idx).classList.remove('hidden');
+    const img = document.getElementById('fotoImg' + idx);
+    img.classList.add('hidden');
+    img.src = '';
+  }
+
+  // Resize + kompres foto ke JPEG lewat Canvas sebelum dipakai. Foto asli dari
+  // kamera/galeri bisa 3-15 MB — tanpa ini, proses bikin PDF (jsPDF) dan upload
+  // background ke Drive jadi berat & lama. Lebar maks 1400px sudah lebih dari
+  // cukup untuk kualitas cetak/lihat di dokumen resmi.
+  function kompresGambar(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxWidth) {
+            height = Math.round(height * (maxWidth / width));
+            width = maxWidth;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve({ dataUrl, base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+        };
+        img.onerror = () => reject(new Error('Gagal memuat gambar'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Gagal membaca file'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function pilihFoto(idx) {
+    const input = document.getElementById('fotoInput' + idx);
+    const file = input.files[0];
+    if (!file) return;
+    const slotEl = document.getElementById('fotoSlot' + idx);
+    slotEl.style.opacity = '0.5';
+    try {
+      const { dataUrl, base64, mimeType } = await kompresGambar(file, 1400, 0.82);
+      fotoSlots[idx] = { kind: 'new', data: base64, mimeType: mimeType };
+      tampilkanFotoSlot(idx, dataUrl);
+    } catch (e) {
+      alert('Gagal memproses foto, coba pilih foto lain.');
+    }
+    slotEl.style.opacity = '1';
+  }
+
+  let rapikanSedangJalan = false;
+  const AI_BTN_DEFAULT = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.5L19 9l-5.1 1.5L12 16l-1.9-5.5L5 9l5.1-1.5L12 2z"/></svg>Rapikan dengan AI`;
+  const AI_BTN_LOADING = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Merapikan...`;
+
+  async function rapikan(fieldId, btnEl) {
+    if (rapikanSedangJalan) return;
+    const el = document.getElementById(fieldId);
+    const teks = el.value;
+    if (!teks.trim()) return;
+    rapikanSedangJalan = true;
+    el.disabled = true;
+    document.querySelectorAll('.ai-err, .ai-success').forEach(e2 => e2.remove());
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = AI_BTN_LOADING; }
+    try {
+      const res = await apiPost({ action: 'rapikanDenganAI', teks }, 20000);
+      if (res.success) {
+        el.value = res.hasil;
+        el.insertAdjacentHTML('afterend', `<div class="success-msg ai-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Sudah dirapikan AI</div>`);
+        setTimeout(() => { document.querySelectorAll('.ai-success').forEach(e2 => e2.remove()); }, 4000);
+      } else {
+        el.insertAdjacentHTML('afterend', `<div class="error-msg ai-err" style="display:block; margin-top:6px;">${res.message}</div>`);
+        setTimeout(() => { document.querySelectorAll('.ai-err').forEach(e2 => e2.remove()); }, 6000);
+      }
+    } catch (e) {
+      el.insertAdjacentHTML('afterend', `<div class="error-msg ai-err" style="display:block; margin-top:6px;">Server sedang lambat, coba lagi sebentar.</div>`);
+      setTimeout(() => { document.querySelectorAll('.ai-err').forEach(e2 => e2.remove()); }, 6000);
+    }
+    el.disabled = false;
+    if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = AI_BTN_DEFAULT; }
+    rapikanSedangJalan = false;
+  }
+
+  let draftTimer = null;
+  function jadwalkanAutosave() { clearTimeout(draftTimer); draftTimer = setTimeout(simpanDraft, 1500); }
+  ['f_tempat','f_jenis','f_hadir','f_agenda','f_pembahasan','f_keputusan','f_nextTanggal','f_nextTempat'].forEach(id => {
+    document.addEventListener('input', function(e) { if (e.target.id === id) jadwalkanAutosave(); });
+  });
+  function simpanDraft() { localStorage.setItem(DRAFT_KEY, JSON.stringify(ambilForm())); }
+  function cekDraft() { if (localStorage.getItem(DRAFT_KEY)) document.getElementById('draftBanner').classList.remove('hidden'); }
+  function lanjutkanDraft() {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    isiForm(JSON.parse(raw));
+    document.getElementById('draftBanner').classList.add('hidden');
+  }
+  function buangDraft() { localStorage.removeItem(DRAFT_KEY); document.getElementById('draftBanner').classList.add('hidden'); }
+
+  function ambilForm() {
+    const jenis = document.getElementById('f_jenis').value === 'lainnya'
+      ? document.getElementById('f_jenisLain').value
+      : document.getElementById('f_jenis').value;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const tanggalOtomatis = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const waktuOtomatis = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return {
+      id: editId,
+      tanggal: editId ? (window.__editTanggal || tanggalOtomatis) : tanggalOtomatis,
+      waktu: editId ? (window.__editWaktu || waktuOtomatis) : waktuOtomatis,
+      tempat: document.getElementById('f_tempat').value,
+      jenisRapat: jenis,
+      jumlahHadir: document.getElementById('f_hadir').value,
+      agenda: document.getElementById('f_agenda').value,
+      pembahasan: document.getElementById('f_pembahasan').value,
+      keputusan: document.getElementById('f_keputusan').value,
+      kas: kumpulkanKas(),
+      rapatBerikutTanggal: document.getElementById('f_nextTanggal').value,
+      rapatBerikutTempat: document.getElementById('f_nextTempat').value
+    };
+  }
+
+  function isiForm(d) {
+    window.__editTanggal = d.tanggal || '';
+    window.__editWaktu = d.waktu || '';
+    document.getElementById('f_tempat').value = d.tempat || '';
+    document.getElementById('f_hadir').value = d.jumlahHadir || '';
+    document.getElementById('f_agenda').value = d.agenda || '';
+    document.getElementById('f_pembahasan').value = d.pembahasan || '';
+    document.getElementById('f_keputusan').value = d.keputusan || '';
+    document.getElementById('f_nextTanggal').value = d.rapatBerikutTanggal || '';
+    document.getElementById('f_nextTempat').value = d.rapatBerikutTempat || '';
+    document.getElementById('kasWrap').innerHTML = '';
+    (d.kas || []).forEach(k => tambahKas(k.nama, k.saldoLalu, k.masuk, k.keluar));
+
+    // Muat foto lama (kalau ada) sebagai thumbnail — otomatis ikut ke PDF baru
+    // kecuali sekretaris mengganti slot itu dengan foto baru.
+    fotoSlots = [null, null, null];
+    for (let i = 0; i < 3; i++) {
+      if (d.fotoData && d.fotoData[i]) {
+        const f = d.fotoData[i];
+        fotoSlots[i] = { kind: 'existing', id: f.id, data: f.data, mimeType: f.mimeType };
+        tampilkanFotoSlot(i, `data:${f.mimeType};base64,${f.data}`);
+      } else {
+        kosongkanFotoSlot(i);
+      }
+    }
+  }
+
+  /* ================= PDF (jsPDF langsung — cepat, tanpa screenshot HTML) ================= */
+
+  const PDF_LHF = 1.15;
+  function pdfLineH(doc, fontSize) { return fontSize * PDF_LHF / doc.internal.scaleFactor; }
+  function safeTxt(v) { return (v === undefined || v === null || v === '') ? '-' : String(v); }
+
+  function ensureSpace(doc, y, needed) {
+    if (y + needed > 283) { doc.addPage(); return 15; }
+    return y;
+  }
+
+  function sectionHeader(doc, text, x, y) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+    doc.text(text, x, y);
+    const w = doc.getTextWidth(text);
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+    doc.line(x, y + 1, x + w, y + 1);
+    return y + 6;
+  }
+
+  function bodyParagraph(doc, text, x, y, maxW) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(20, 20, 20);
+    const lines = doc.splitTextToSize(safeTxt(text), maxW);
+    const lineH = pdfLineH(doc, 10.5);
+    y = ensureSpace(doc, y, lines.length * lineH);
+    doc.text(lines, x, y, { lineHeightFactor: PDF_LHF });
+    return y + lines.length * lineH + 4;
+  }
+
+  function drawKasTable(doc, x, yStart, colWidths, rows) {
+    let y = yStart;
+    const rowH = 7;
+    const totalW = colWidths.reduce((a, b) => a + b, 0);
+    const header = ['Nama Kas', 'Saldo Lalu', 'Pemasukan', 'Pengeluaran', 'Saldo Kini'];
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.rect(x, y, totalW, rowH);
+    let cx = x;
+    header.forEach((h, i) => {
+      if (i > 0) doc.line(cx, y, cx, y + rowH);
+      doc.text(h, i === 0 ? cx + 2 : cx + colWidths[i] - 2, y + rowH / 2 + 1.2, { align: i === 0 ? 'left' : 'right' });
+      cx += colWidths[i];
+    });
+    y += rowH;
+    doc.setFont('helvetica', 'normal');
+    rows.forEach(r => {
+      y = ensureSpace(doc, y, rowH);
+      doc.rect(x, y, totalW, rowH);
+      let cx2 = x;
+      r.forEach((val, i) => {
+        if (i > 0) doc.line(cx2, y, cx2, y + rowH);
+        doc.text(String(val), i === 0 ? cx2 + 2 : cx2 + colWidths[i] - 2, y + rowH / 2 + 1.2, { align: i === 0 ? 'left' : 'right' });
+        cx2 += colWidths[i];
+      });
+      y += rowH;
+    });
+    return y + 4;
+  }
+
+  function jsPdfFormat(mimeType) {
+    return (mimeType || '').includes('png') ? 'PNG' : 'JPEG';
+  }
+
+  function formatRupiah(n) {
+    const angka = Math.round(Number(n) || 0);
+    return 'Rp' + angka.toLocaleString('id-ID');
+  }
+
+  function buildNotulenPdf(payload, nomorNotulen, unit, fotoItems) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = 210, marginX = 20, contentW = pageW - marginX * 2;
+    let y = 20;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
+    doc.text('NOTULEN RAPAT', pageW / 2, y, { align: 'center' });
+    y += 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+    doc.text(`${unit} — ${safeTxt(payload.jenisRapat)}`, pageW / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+    doc.text(`Nomor: ${nomorNotulen}`, pageW / 2, y, { align: 'center' });
+    y += 4;
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.7);
+    doc.line(marginX, y, pageW - marginX, y);
+    doc.setLineWidth(0.2);
+    doc.line(marginX, y + 1, pageW - marginX, y + 1);
+    y += 8;
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(20, 20, 20);
+    const infoRows = [
+      ['Hari, tanggal', payload.tanggal],
+      ['Waktu', payload.waktu],
+      ['Tempat', payload.tempat],
+      ['Jumlah hadir', `${safeTxt(payload.jumlahHadir)} orang`]
+    ];
+    infoRows.forEach(([label, val]) => {
+      doc.text(label, marginX, y);
+      doc.text(':', marginX + 32, y);
+      doc.text(safeTxt(val), marginX + 36, y);
+      y += 5.5;
+    });
+    y += 3;
+
+    y = sectionHeader(doc, 'Agenda', marginX, y);
+    y = bodyParagraph(doc, payload.agenda, marginX, y, contentW);
+
+    y = ensureSpace(doc, y, 10);
+    y = sectionHeader(doc, 'Pembahasan & Usulan', marginX, y);
+    y = bodyParagraph(doc, payload.pembahasan, marginX, y, contentW);
+
+    y = ensureSpace(doc, y, 10);
+    y = sectionHeader(doc, 'Keputusan / Hasil Rapat', marginX, y);
+    y = bodyParagraph(doc, payload.keputusan, marginX, y, contentW);
+
+    if (payload.kas && payload.kas.length > 0) {
+      y = ensureSpace(doc, y, 20);
+      y = sectionHeader(doc, 'Laporan Kas', marginX, y);
+      const kasRows = payload.kas.map(k => [k.nama, formatRupiah(k.saldoLalu), formatRupiah(k.masuk), formatRupiah(k.keluar), formatRupiah(k.saldoAkhir)]);
+      y = drawKasTable(doc, marginX, y, [contentW * 0.3, contentW * 0.175, contentW * 0.175, contentW * 0.175, contentW * 0.175], kasRows);
+    }
+
+    if (payload.rapatBerikutTanggal || payload.rapatBerikutTempat) {
+      y = ensureSpace(doc, y, 15);
+      y = sectionHeader(doc, 'Rencana Rapat Berikutnya', marginX, y);
+      const teks = safeTxt(payload.rapatBerikutTanggal) + (payload.rapatBerikutTempat ? ' — ' + payload.rapatBerikutTempat : '');
+      y = bodyParagraph(doc, teks, marginX, y, contentW);
+    }
+
+    if (fotoItems.length > 0) {
+      const captions = ['Daftar hadir', 'Suasana rapat', 'Dokumentasi tambahan'];
+      const gap = 6, perRow = 3;
+      const imgW = (contentW - gap * (perRow - 1)) / perRow, imgH = imgW * 0.75;
+      y = ensureSpace(doc, y, 10 + imgH + 6);
+      y = sectionHeader(doc, 'Dokumentasi', marginX, y);
+      fotoItems.forEach((item, i) => {
+        const x = marginX + i * (imgW + gap);
+        try {
+          doc.addImage(`data:${item.mimeType};base64,${item.data}`, jsPdfFormat(item.mimeType), x, y, imgW, imgH);
+        } catch (e) { /* lewati foto yang gagal, jangan gagalkan seluruh PDF */ }
+        doc.setFontSize(8.5); doc.setTextColor(70, 70, 70);
+        doc.text(captions[i] || 'Foto', x + imgW / 2, y + imgH + 4, { align: 'center' });
+      });
+      y += imgH + 10;
+    }
+
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text(`Dibuat otomatis melalui sistem notulen digital — ${unit} · ${nomorNotulen}`, pageW / 2, 290, { align: 'center' });
+
+    return doc;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function validateForm(payload) {
+    const wajib = [
+      ['tempat', 'Tempat'],
+      ['jumlahHadir', 'Jumlah hadir'],
+      ['agenda', 'Agenda'],
+      ['pembahasan', 'Pembahasan & usulan'],
+      ['keputusan', 'Keputusan / hasil rapat']
+    ];
+    return wajib.filter(([key]) => !String(payload[key] || '').trim()).map(([key, label]) => ({ key, label }));
+  }
+
+  const FIELD_ID_MAP = { tempat: 'f_tempat', jumlahHadir: 'f_hadir', agenda: 'f_agenda', pembahasan: 'f_pembahasan', keputusan: 'f_keputusan' };
+
+  async function simpan() {
+    const payload = ambilForm();
+
+    const fieldKosong = validateForm(payload);
+    const statusEl = document.getElementById('statusMsg');
+    if (fieldKosong.length > 0) {
+      statusEl.innerHTML = `<span style="color:var(--danger)">Lengkapi dulu: ${fieldKosong.map(f => f.label).join(', ')}</span>`;
+      const el = document.getElementById(FIELD_ID_MAP[fieldKosong[0].key]);
+      el.classList.add('shake');
+      el.focus();
+      setTimeout(() => el.classList.remove('shake'), 400);
+      return;
+    }
+
+    // Pisahkan foto: yang masih "existing" (tidak diganti) tinggal dikirim ID-nya lagi,
+    // yang "new" perlu diupload. Untuk PDF, gabungan keduanya dipakai (urut sesuai slot).
+    const fotoUrlsLama = fotoSlots.filter(f => f && f.kind === 'existing').map(f => f.id);
+    const fotoBaru = fotoSlots.filter(f => f && f.kind === 'new').map(f => ({ data: f.data, mimeType: f.mimeType }));
+    const fotoUntukPdf = fotoSlots.filter(f => f !== null).map(f => ({ data: f.data, mimeType: f.mimeType }));
+
+    payload.fotoUrls = fotoUrlsLama;
+    payload.fotoBase64 = fotoBaru;
+
+    const btn = document.getElementById('btnSimpan');
+    btn.disabled = true;
+
+    statusEl.textContent = 'Menyimpan data...';
+    const res = await apiPost({ action: 'simpanNotulen', payload, unit: currentUnit });
+    if (res.error) { statusEl.textContent = 'Gagal: ' + res.error; btn.disabled = false; return; }
+
+    statusEl.textContent = 'Membuat PDF...';
+    let doc = null;
+    try {
+      doc = buildNotulenPdf(payload, res.nomorNotulen, currentUnit, fotoUntukPdf);
+      const fileName = `Notulen_${currentUnit}_${payload.tanggal}.pdf`.replace(/\s+/g, '_');
+      doc.save(fileName); // unduh instan ke device, tidak perlu nunggu jaringan
+    } catch (e) {
+      statusEl.textContent = 'Data tersimpan, tapi PDF gagal dibuat.';
+    }
+
+    btn.disabled = false;
+    statusEl.textContent = '';
+    localStorage.removeItem(DRAFT_KEY);
+    editId = null;
+    window.__editTanggal = null;
+    window.__editWaktu = null;
+    fotoSlots = [null, null, null];
+    for (let i = 0; i < 3; i++) kosongkanFotoSlot(i);
+    tampilkanSeal(res.nomorNotulen, currentUnit);
+
+    // Upload ke Drive jalan di belakang layar — tidak menahan user menunggu.
+    // Kalau gagal (jaringan lambat dll), file sudah aman di device; hanya
+    // link "Unduh" di Riwayat yang belum terisi untuk notulen ini (bisa
+    // dibuat ulang lewat tombol "Buat ulang PDF" di tab Riwayat).
+    if (doc) {
+      (async () => {
+        try {
+          const pdfBase64 = await blobToBase64(doc.output('blob'));
+          await apiPost({ action: 'simpanPdf', id: res.id, unit: currentUnit, pdfBase64 }, 30000);
+        } catch (e) { /* diam-diam gagal, salinan lokal sudah ada di device */ }
+      })();
+    }
+  }
+
+  let pdfUrlAktif = null;
+  function tampilkanSeal(nomor, unit) {
+    document.getElementById('sealNomor').textContent = nomor;
+    document.getElementById('sealUnit').textContent = unit;
+    document.getElementById('sealOverlay').classList.remove('hidden');
+  }
+  function tutupSeal() {
+    document.getElementById('sealOverlay').classList.add('hidden');
+  }
+
+  async function muatRiwayat() {
+    const keyword = document.getElementById('cariRiwayat').value;
+    const list = await apiGet({ action: 'getRiwayat', unit: currentUnit, keyword });
+    const wrap = document.getElementById('riwayatList');
+    if (!list || list.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">Belum ada notulen tersimpan.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(item => `
+      <div class="riwayat-item">
+        <div class="riwayat-icon" onclick="bukaDetail('${item.id}')" style="cursor:pointer;"><svg viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+        <div style="flex:1; cursor:pointer;" onclick="bukaDetail('${item.id}')">
+          <div class="r-title">${item.agenda || '(tanpa agenda)'}</div>
+          <div class="r-meta">${item.tanggal} · ${item.jenisRapat} · ${item.nomorNotulen}</div>
+        </div>
+        <button class="btn-icon-edit" title="Edit notulen ini" onclick="event.stopPropagation(); bukaDetail('${item.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        </button>
+        ${item.pdfUrl
+          ? `<button class="btn-ghost" style="flex-shrink:0;" onclick="event.stopPropagation(); window.open('${item.pdfUrl}', '_blank')">Unduh</button>`
+          : `<button class="btn-ghost" id="buatUlang_${item.id}" style="flex-shrink:0; color:var(--danger); background:#FEF2F2;" onclick="event.stopPropagation(); buatUlangPdf('${item.id}', this)">Buat ulang PDF</button>`}
+      </div>
+    `).join('');
+  }
+
+  // Dipanggil kalau upload PDF di background gagal waktu simpan pertama kali
+  // (pdfUrl kosong di sheet). Ambil ulang data lengkap + foto dari server,
+  // build ulang PDF di browser, unduh lokal, lalu coba upload lagi ke Drive.
+  async function buatUlangPdf(id, btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = 'Memproses...';
+    try {
+      const d = await apiGet({ action: 'getNotulenDetail', id, unit: currentUnit });
+      if (d.error) { btnEl.textContent = 'Gagal: ' + d.error; return; }
+      const fotoUntukPdf = (d.fotoData || []).map(f => ({ data: f.data, mimeType: f.mimeType }));
+      const doc = buildNotulenPdf(d, d.nomorNotulen, currentUnit, fotoUntukPdf);
+      const fileName = `Notulen_${currentUnit}_${d.tanggal}.pdf`.replace(/\s+/g, '_');
+      doc.save(fileName);
+      const pdfBase64 = await blobToBase64(doc.output('blob'));
+      const uploadRes = await apiPost({ action: 'simpanPdf', id: id, unit: currentUnit, pdfBase64 }, 30000);
+      if (uploadRes.success) {
+        muatRiwayat(); // refresh supaya tombol berubah jadi "Unduh" normal
+      } else {
+        btnEl.disabled = false;
+        btnEl.textContent = 'Buat ulang PDF';
+      }
+    } catch (e) {
+      btnEl.disabled = false;
+      btnEl.textContent = 'Buat ulang PDF';
+    }
+  }
+
+  async function bukaDetail(id) {
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    try {
+      const d = await apiGet({ action: 'getNotulenDetail', id, unit: currentUnit });
+      if (d.error) { alert(d.error); return; }
+      editId = d.id;
+      isiForm(d);
+      showTab('baru');
+      document.getElementById('statusMsg').textContent = 'Mode edit — ubah lalu klik simpan untuk memperbarui.';
+    } catch (e) {
+      alert('Gagal memuat notulen, coba lagi.');
+    } finally {
+      document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+  }
+
+  /* ================= PWA: install prompt & service worker ================= */
+
+  let deferredInstallPrompt = null;
+  const INSTALL_DISMISS_KEY = 'notulen_install_dismissed';
+
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  }
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function tampilkanInstallBanner(platform) {
+    const banner = document.getElementById('installBanner');
+    const btn = document.getElementById('installBannerBtn');
+    if (platform === 'ios') {
+      document.getElementById('installBannerTitle').textContent = 'Pasang di Layar Utama';
+      document.getElementById('installBannerDesc').textContent = 'Tap tombol Share (⬆︎), lalu "Add to Home Screen"';
+      btn.style.display = 'none';
+    } else {
+      document.getElementById('installBannerTitle').textContent = 'Pasang aplikasi ini';
+      document.getElementById('installBannerDesc').textContent = 'Akses lebih cepat tanpa buka browser';
+      btn.style.display = '';
+      btn.onclick = async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        tutupInstallBanner();
+      };
+    }
+    banner.classList.remove('hidden');
+  }
+
+  function tutupInstallBanner() {
+    document.getElementById('installBanner').classList.add('hidden');
+    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+  }
+
+  // Android/Chrome: browser sendiri yang tawarkan event ini kalau syarat PWA terpenuhi
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (!localStorage.getItem(INSTALL_DISMISS_KEY) && !isStandalone()) tampilkanInstallBanner('android');
+  });
+
+  // iOS Safari tidak punya event otomatis sama sekali (dibatasi Apple) — tampilkan
+  // instruksi manual sendiri kalau terdeteksi Safari iOS dan belum di-install.
+  if (isIOS() && !isStandalone() && !localStorage.getItem(INSTALL_DISMISS_KEY)) {
+    setTimeout(() => tampilkanInstallBanner('ios'), 1500);
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
